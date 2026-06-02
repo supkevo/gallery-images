@@ -1,0 +1,201 @@
+<html lang="en">
+<head>
+  <meta charset="UTF-8&qu
+1000
+ot;>
+  <title>Submissions Gallery Uploader</title>
+  <style>
+    body { margin: 0; padding: 0; background: #fafafa; font-family: Arial, sans-serif; }
+    .gallery-upload-box { max-width: 730px; margin: 10px auto; background: #ffffff; border: 1px solid #cccccc; }
+    .gallery-upload-header { background: #a00000; color: #ffffff; padding: 12px 18px; border-bottom: 2px solid #700000; }
+    .gallery-upload-header h2 { margin: 0; font-size: 18px; }
+    .gallery-upload-header p { margin: 3px 0 0 0; font-size: 11px; color: #ffcccc; }
+    .gallery-upload-body { padding: 15px; background: #fafafa; }
+    #drop-zone { border: 2px dashed #a00000; background: #fffefe; padding: 25px 15px; text-align: center; }
+    .w2k-uploader { font-size: 14px; margin-bottom: 12px; padding: 5px; border: 1px solid #ccc; background: #fdfdfd; width: 85%; }
+    #status-text { font-size: 11px; color: #444; background: #eeeeee; padding: 3px 8px; display: inline-block; margin-top: 5px; border: 1px solid #ccc; font-family: monospace; font-weight: bold; }
+    #preview-grid { margin-top: 15px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; }
+    .thumb { background: #ffffff; border: 2px solid #ccc; padding: 10px; border-radius: 6px; position: relative; box-sizing: border-box; display: flex; flex-direction: column; }
+    .thumb img { width: 100%; height: 120px; object-fit: cover; border: 1px solid #aaa; display: block; margin-bottom: 8px; background: #eee; }
+    .thumb label { font-size: 11px; display: block; margin-top: 6px; font-weight: bold; color: #333; }
+    .thumb input, .thumb textarea { width: 100%; font-size: 12px; margin-top: 2px; box-sizing: border-box; padding: 4px; border: 1px solid #ccc; }
+    .thumb textarea { resize: vertical; height: 50px; }
+    .del-btn { position: absolute; top: -6px; right: -6px; background: #a00000; color: #ffffff; border: 1px solid #700000; font-size: 11px; font-weight: bold; cursor: pointer; width: 20px; height: 20px; border-radius: 50%; line-height: 16px; text-align: center; padding: 0; }
+    .thumb-status { font-size: 10px; font-weight: bold; color: #cc7a00; margin-top: 8px; text-align: right; }
+    .thumb-status.ready { color: #008000; }
+    .gallery-meta-field { margin-top: 15px; padding: 12px; border: 1px solid #dddddd; background: #ffffff; border-radius: 4px; }
+    .field-title { font-size: 13px; font-weight: bold; display: block; color: #a00000; }
+    .field-help { font-size: 11px; color: #666; display: block; margin-bottom: 4px; }
+    #img-tags, #img-author { width: 100%; padding: 6px; box-sizing: border-box; border: 1px solid #ccc; font-size: 12px; }
+    #submit-btn { width: 100%; padding: 12px; margin-top: 15px; background: #e0e0e0; color: #999; font-weight: bold; font-size: 14px; border: 1px solid #ccc; cursor: not-allowed; border-radius: 4px; }
+    #submit-btn.active-red-btn { background: #a00000 !important; color: white !important; border-color: #700000 !important; cursor: pointer !important; }
+  </style>
+</head>
+<body>
+<div class="gallery-upload-box">
+  <div class="gallery-upload-header">
+    <h2>Submissions Gallery Uploader</h2>
+    <p>Select up to 30 images. Card fields generate instantly below.</p>
+  </div>
+  <div class="gallery-upload-body">
+    <div id="drop-zone">
+      <input type="file" id="file-input" class="w2k-uploader" accept="image/*" multiple><br>
+      <span id="status-text">Status: IDLE</span>
+    </div>
+    <div id="preview-grid"></div>
+    <div class="gallery-meta-field">
+      <span class="field-title">Gallery Tags</span>
+      <span class="field-help">Batch submission tags (comma separated)</span>
+      <input type="text" id="img-tags" oninput="checkFormValidationE
+1000
+ngine()">
+    </div>
+    <div class="gallery-meta-field">
+      <span class="field-title">Username</span>
+      <span class="field-help">Who gets credit?</span>
+      <input type="text" id="img-author" oninput="checkFormValidationEngine()">
+    </div>
+    <button id="submit-btn" disabled onclick="fireFinalDataSubmission()">Submit to Admin Queue</button>
+  </div>
+</div>
+
+<script>
+// PASTE YOUR RE-DEPLOYED GOOGLE APPS SCRIPT WEB APP URL HERE
+const SCRIPT_URL = "YOUR_GOOGLE_APPS_SCRIPT_WEB_APP_URL"; 
+
+let imageCardsList = [];
+
+window.removeImgCard = function(cardId) {
+  const card = document.getElementById(cardId);
+  if (card) card.remove();
+  imageCardsList = imageCardsList.filter(function(item) { return item.id !== cardId; });
+  checkFormValidationEngine();
+};
+
+document.getElementById('file-input').addEventListener('change', function(e) {
+  const files = Array.from(e.target.files);
+  if (files.length === 0) return;
+  
+  const fileCount = Math.min(files.length, 30);
+  const statusText = document.getElementById('status-text');
+  const previewGrid = document.getElementById('preview-grid');
+  previewGrid.innerHTML = ''; 
+  imageCardsList = [];
+  
+  statusText.textContent = "Status: PROCESSING BULK CARDS...";
+
+  for (let i = 0; i < fileCount; i++) {
+    const file = files[i];
+    const imgId = 'img_' + Math.random().toString(36).substr(2, 9);
+    const rawName = file.name.substring(0, file.name.lastIndexOf('.')) || file.name;
+    const parsedTitle = rawName.replace(/[^a-zA-Z0-9\s-_]/g, "");
+
+    const thumbDiv = document.createElement('div');
+    thumbDiv.className = 'thumb';
+    thumbDiv.id = imgId;
+    
+    let cardHTML = '';
+    cardHTML += '<button class="del-btn" onclick="window.removeImgCard(\'' + imgId + '\')">×</button>';
+    cardHTML += '<img id="preview-' + imgId + '" src="" alt="Loading...">';
+    cardHTML += '<label>Photo Title</label>';
+    cardHTML += '<input type="text" class="thumb-title-input" value="' + parsedTitle + '" oninput="checkFormValidationEngine()">';
+    cardHTML += '<label>Image Description</label>';
+    cardHTML += '<textarea class="thumb-desc-input" placeholder="Write description..." oninput="checkFormValidationEngine()"></textarea>';
+    cardHTML += '<label>Date Taken</label>';
+    cardHTML += '<input type="date" class="thumb-date-taken-input" onchange="checkFormValidationEngine()">';
+    cardHTML += '<div id="status-' + imgId + '" class="thumb-status">⏳ CACHING...</div>';
+    
+    thumbDiv.innerHTML = cardHTML;
+    previewGrid.appendChild(thumbDiv);
+
+    const reader = new FileReader();
+    reader.onload = function(event) {
+      document.getElementById("preview-" + imgId).src = event.target.result;
+      const rawBase = event.target.result;
+      const base64Content = rawBase.substr(rawBase.indexOf(',') + 1);
+      
+      imageCardsList.push({ id: imgId, fileName: file.name, base64: base64Content });
+      document.getElementById("status-" + imgId).textContent = "✅ LOCAL READY";
+      statusText.textContent = "Status: PREVIEWS LOGGED. COMPLETE REQUIRED TEXT FORMS.";
+      checkFormValidationEngine();
+    };
+    reader.readAsDataURL(file);
+  }
+});
+
+function checkFormValidationEngine() {
+  const submitBtn = document.getElementById('submit-btn');
+  const authorVal = document.getElementById('img-author').value.trim();
+  const tagsVal = document.getElementById('img-tags').value.trim();
+  
+  if (imageCardsList.length === 0 || !authorVal || !tagsVal) {
+    submitBtn.disabled = true;
+    submitBtn.classList.remove('active-red-btn');
+    return;
+  }
+  
+  let allCardsValid = true;
+  for (let j = 0; j < imageCardsList.length; j++) {
+    const card = imageCardsList[j];
+    const cardEl = document.getElementById(card.id);
+    if (cardEl) {
+      const desc = cardEl.querySelector('.thumb-desc-input').value.trim();
+      const date = cardEl.querySelector('.thumb-date-taken-input').value;
+      if (!desc || !date) allCardsValid = false;
+    }
+  }
+
+  if (allCardsValid) {
+    submitBtn.disabled = false;
+    submitBtn.classList.add('active-red-btn');
+  } else {
+    submitBtn.disabled = true;
+    submitBtn.classList.remove('active-red-btn');
+  }
+}
+
+async function fireFinalDataSubmission() {
+  const submitBtn = document.getElementById('submit-btn');
+  const generalStatus = document.getElementById('status-text');
+  submitBtn.disabled = true;
+  submitBtn.classList.remove('active-red-btn');
+  generalStatus.textContent = "Status: UPLOADING VIA SECURE PROXY...";
+  
+  let masterPayloadArr = [];
+  for (let k = 0; k < imageCardsList.length; k++) {
+    const card = imageCardsList[k];
+    const cardEl = document.getElementById(card.id);
+    if (cardEl) {
+      masterPayloadArr.push({
+        base64: card.base64,
+        fileName: card.fileName,
+        title: cardEl.querySelector('.thumb-title-input').value.trim(),
+        description: cardEl.querySelector('.thumb-desc-input').value.trim(),
+        date: cardEl.querySelector('.thumb-date-taken-input').value,
+        author: document.getElementById('img-author').value.trim(),
+        tags: document.getElementById('img-tags').value.trim()
+      });
+    }
+  }
+
+  try {
+    await fetch(SCRIPT_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ batch: masterPayloadArr })
+    });
+    generalStatus.textContent = "Status: BATCH PROCESSED SUCCESSFULLY!";
+    alert("Batch files uploaded successfully!");
+    location.reload();
+  } catch (err) {
+    generalStatus.textContent = "Status: TRANSMISSION FAULT.";
+    submitBtn.disabled = false;
+    submitBtn.classList.add('active-red-btn');
+  }
+}
+</script>
+</body<
+1000
+/span>>
+</html>
